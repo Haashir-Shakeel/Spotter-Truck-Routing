@@ -68,9 +68,10 @@ REST_FRAMEWORK = {
 }
 
 # External providers (keys stay server-side).
-ROUTING_API_KEY = env("ROUTING_API_KEY", default="")
-WEATHER_API_BASE_URL = env("WEATHER_API_BASE_URL", default="https://api.open-meteo.com/v1")
+MAPBOX_ACCESS_TOKEN = env("MAPBOX_ACCESS_TOKEN", default="")
+OPEN_METEO_BASE_URL = env("OPEN_METEO_BASE_URL", default="https://api.open-meteo.com/v1")
 PROVIDER_TIMEOUT_SECONDS = env.float("PROVIDER_TIMEOUT_SECONDS", default=10.0)
+PROVIDER_MAX_RETRIES = env.int("PROVIDER_MAX_RETRIES", default=2)
 
 LOGGING = {
     "version": 1,
@@ -78,4 +79,9 @@ LOGGING = {
     "formatters": {"simple": {"format": "%(asctime)s %(levelname)s %(name)s: %(message)s"}},
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "simple"}},
     "root": {"handlers": ["console"], "level": env("LOG_LEVEL", default="INFO")},
+    # httpx logs full request URLs at INFO, which would include the Mapbox access token.
+    "loggers": {
+        "httpx": {"level": "WARNING"},
+        "httpcore": {"level": "WARNING"},
+    },
 }
