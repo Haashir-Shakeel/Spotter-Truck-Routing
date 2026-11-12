@@ -11,6 +11,41 @@ Coordinate = tuple[float, float]
 
 
 @dataclass(frozen=True, slots=True)
+class GeocodedPlace:
+    name: str
+    lon: float
+    lat: float
+
+
+@dataclass(frozen=True, slots=True)
+class RouteOption:
+    """A provider route normalized to internal units."""
+
+    route_id: str
+    coordinates: tuple[Coordinate, ...]
+    distance_miles: float
+    duration_seconds: float
+    # Seconds from departure at each coordinate, when the provider gives per-segment timings.
+    cumulative_durations: tuple[float, ...] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class HourlyForecast:
+    """Hourly series for one requested point. Values are None where the provider has no data.
+
+    Precipitation values are the amount that fell during the hour *ending* at ``times[i]``,
+    which is an in/hr rate for that hour.
+    """
+
+    lon: float
+    lat: float
+    times: tuple[datetime, ...]  # UTC, hourly, ascending
+    wind_mph: tuple[float | None, ...]
+    rain_in_per_hour: tuple[float | None, ...]
+    snow_in_per_hour: tuple[float | None, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class Checkpoint:
     """A weather sampling point placed by road distance, with the truck's estimated arrival."""
 

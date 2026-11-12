@@ -13,14 +13,18 @@ All timestamps are UTC. Departure must be timezone-aware so DST and offsets are 
 """
 
 import math
-from bisect import bisect_right
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from itertools import pairwise
 
 from apps.routing.domain.types import Checkpoint, Coordinate
 
-from .geo import cumulative_distances_miles, validate_coordinates
+from .geo import (
+    cumulative_distances_miles,
+    interpolate_on_segment,
+    segment_position,
+    validate_coordinates,
+)
 
 ALLOWED_INTERVALS_MILES = (10, 25, 50)
 
@@ -42,15 +46,6 @@ def checkpoint_distances(total_miles: float, interval_miles: float) -> list[floa
     else:
         positions[-1] = total_miles
     return positions
-
-
-def _segment_position(cumulative: Sequence[float], target: float) -> tuple[int, float]:
-    """Index of the segment containing ``target`` and the fraction (0..1) along it."""
-    last_segment = len(cumulative) - 2
-    i = min(max(bisect_right(cumulative, target) - 1, 0), last_segment)
-    length = cumulative[i + 1] - cumulative[i]
-    fraction = 0.0 if length <= 0 else (target - cumulative[i]) / length
-    return i, min(max(fraction, 0.0), 1.0)
 
 
 def _validate_durations(cumulative_durations: Sequence[float], vertex_count: int) -> None:
@@ -103,8 +98,8 @@ def generate_checkpoints(
     checkpoints: list[Checkpoint] = []
 
     for index, distance in enumerate(checkpoint_distances(route_miles, interval_miles)):
-        seg, fraction = _segment_position(cumulative, distance)
-        (lon1, lat1), (lon2, lat2) = coordinates[seg], coordinates[seg + 1]
+        seg, fraction = segment_position(cumulative, distance)
+        lon, lat = interpolate_on_segment(coordinates, seg, fraction)
 
         if cumulative_durations is not None:
             start, end = cumulative_durations[seg], cumulative_durations[seg + 1]
@@ -115,9 +110,8 @@ def generate_checkpoints(
         checkpoints.append(
             Checkpoint(
                 index=index,
-                # Linear interpolation inside one polyline segment; road segments are short.
-                lon=lon1 + fraction * (lon2 - lon1),
-                lat=lat1 + fraction * (lat2 - lat1),
+                lon=lon,
+                lat=lat,
                 distance_miles=distance,
                 elapsed_seconds=elapsed,
                 arrival_at=departure_utc + timedelta(seconds=elapsed),

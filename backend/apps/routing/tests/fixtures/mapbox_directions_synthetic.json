@@ -1,0 +1,159 @@
+{
+  "_note": "SYNTHETIC test fixture in the Mapbox response format. Not real route or place data.",
+  "code": "Ok",
+  "uuid": "synthetic",
+  "waypoints": [
+    {
+      "name": "Origin",
+      "location": [
+        -87.6298,
+        41.8781
+      ]
+    },
+    {
+      "name": "Destination",
+      "location": [
+        -83.0458,
+        42.3314
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -87.6298,
+            41.8781
+          ],
+          [
+            -86.5,
+            41.7
+          ],
+          [
+            -85.6,
+            42.2
+          ],
+          [
+            -84.5,
+            42.25
+          ],
+          [
+            -83.0458,
+            42.3314
+          ]
+        ]
+      },
+      "distance": 455000.0,
+      "duration": 14200.0,
+      "weight": 14200.0,
+      "weight_name": "auto",
+      "legs": [
+        {
+          "summary": "",
+          "distance": 455000.0,
+          "duration": 14200.0,
+          "steps": [],
+          "annotation": {
+            "duration": [
+              3600.0,
+              3000.0,
+              3200.0,
+              4400.0
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -87.6298,
+            41.8781
+          ],
+          [
+            -86.2,
+            41.95
+          ],
+          [
+            -84.9,
+            42.5
+          ],
+          [
+            -83.0458,
+            42.3314
+          ]
+        ]
+      },
+      "distance": 470000.0,
+      "duration": 14300.0,
+      "weight": 14300.0,
+      "weight_name": "auto",
+      "legs": [
+        {
+          "summary": "",
+          "distance": 470000.0,
+          "duration": 14300.0,
+          "steps": [],
+          "annotation": {
+            "duration": [
+              4000.0,
+              4200.0,
+              6100.0
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -87.6298,
+            41.8781
+          ],
+          [
+            -86.8,
+            41.4
+          ],
+          [
+            -85.0,
+            41.5
+          ],
+          [
+            -83.6,
+            41.65
+          ],
+          [
+            -83.0458,
+            42.3314
+          ]
+        ]
+      },
+      "distance": 480000.0,
+      "duration": 15000.0,
+      "weight": 15000.0,
+      "weight_name": "auto",
+      "legs": [
+        {
+          "summary": "",
+          "distance": 480000.0,
+          "duration": 15000.0,
+          "steps": [],
+          "annotation": {
+            "duration": [
+              3300.0,
+              4600.0,
+              3500.0,
+              3600.0
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

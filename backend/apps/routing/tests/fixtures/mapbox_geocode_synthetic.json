@@ -1,0 +1,39 @@
+{
+  "_note": "SYNTHETIC test fixture in the Mapbox response format. Not real route or place data.",
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "a",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -87.6298,
+          41.8781
+        ]
+      },
+      "properties": {
+        "feature_type": "place",
+        "name": "Chicago",
+        "full_address": "Chicago, Illinois, United States"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "b",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -89.39,
+          43.07
+        ]
+      },
+      "properties": {
+        "feature_type": "place",
+        "name": "Chicago Heights",
+        "place_formatted": "Illinois, United States"
+      }
+    }
+  ],
+  "attribution": "synthetic"
+}
