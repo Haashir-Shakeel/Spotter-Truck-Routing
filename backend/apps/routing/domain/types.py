@@ -1,9 +1,25 @@
 """Framework-free value objects shared by the risk, aggregation and recommendation services."""
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 
 from .risk_levels import RiskLevel
+
+# (longitude, latitude) in degrees — GeoJSON order, as returned by routing providers.
+Coordinate = tuple[float, float]
+
+
+@dataclass(frozen=True, slots=True)
+class Checkpoint:
+    """A weather sampling point placed by road distance, with the truck's estimated arrival."""
+
+    index: int
+    lon: float
+    lat: float
+    distance_miles: float
+    elapsed_seconds: float
+    arrival_at: datetime  # always UTC
 
 
 @dataclass(frozen=True, slots=True)
