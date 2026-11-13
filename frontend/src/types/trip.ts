@@ -95,3 +95,16 @@ export interface TripAnalysis {
   routes: RouteResult[]
   warnings: AnalysisWarning[]
 }
+
+/** GET /api/v1/trips/{id}/corridor-forecast/: risk across the corridor for each forecast hour. */
+export interface CorridorForecast {
+  analysis_id: string
+  start_at: string // departure, floored to the hour (UTC)
+  hour_count: number // 49: hours 0..48
+  spacing_miles: number
+  buffer_miles: number
+  levels: RiskLevel[] // index -> level name
+  points: LngLat[]
+  /** risk[hour][point]: index into `levels`, or null when the forecast is unavailable */
+  risk: (number | null)[][]
+}

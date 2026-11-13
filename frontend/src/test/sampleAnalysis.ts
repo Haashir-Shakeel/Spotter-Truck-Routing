@@ -1,5 +1,5 @@
 /** SAMPLE response for tests only. Not real route or weather data. */
-import type { Checkpoint, RiskLevel, RouteResult, TripAnalysis } from '../types/trip'
+import type { Checkpoint, CorridorForecast, RiskLevel, RouteResult, TripAnalysis } from '../types/trip'
 
 function checkpoint(index: number, miles: number, risk: RiskLevel | null, lon: number): Checkpoint {
   return {
@@ -82,5 +82,25 @@ export const sampleAnalysis: TripAnalysis = {
   ],
   warnings: [
     { code: 'FEWER_ROUTES', message: 'The routing service returned 2 distinct routes for this trip, not 3.' },
+  ],
+}
+
+/** SAMPLE corridor: 3 points x 3 hours. Hour 1 mixes levels and a gap; hour 2 has no data. */
+export const sampleCorridor: CorridorForecast = {
+  analysis_id: sampleAnalysis.analysis_id,
+  start_at: '2026-11-13T13:00:00+00:00',
+  hour_count: 3,
+  spacing_miles: 15,
+  buffer_miles: 20,
+  levels: ['LOW', 'MODERATE', 'HIGH', 'SEVERE', 'NO_TRAVEL'],
+  points: [
+    [-90, 40],
+    [-89, 40],
+    [-88, 40],
+  ],
+  risk: [
+    [0, 0, 0],
+    [1, 3, null],
+    [null, null, null],
   ],
 }
