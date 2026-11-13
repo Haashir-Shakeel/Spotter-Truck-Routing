@@ -10,16 +10,20 @@ import { type ApiHealth, useApiHealth } from './hooks/useApiHealth'
 import { useCorridorForecast } from './hooks/useCorridorForecast'
 import { useTripAnalysis } from './hooks/useTripAnalysis'
 import { hourTime, truckPositionAt } from './lib/corridor'
+import { formatDateTime } from './lib/format'
 import type { TripAnalyzeRequest } from './types/trip'
 
 const HEALTH_LABEL: Record<ApiHealth, string> = {
   checking: 'Checking API…',
+  // Free hosting puts idle services to sleep; the first visit wakes it.
+  waking: 'Waking API (can take up to a minute)…',
   online: 'API online',
   offline: 'API offline',
 }
 
 const HEALTH_DOT: Record<ApiHealth, string> = {
   checking: 'bg-slate-400',
+  waking: 'animate-pulse bg-amber-500',
   online: 'bg-emerald-500',
   offline: 'bg-red-500',
 }
@@ -185,6 +189,19 @@ function App() {
           )}
         </aside>
       </main>
+
+      <footer className="border-t border-slate-200 bg-white px-4 py-1.5 text-xs text-slate-500">
+        Routes and places:{' '}
+        <a href="https://www.mapbox.com/about/maps/" className="underline" target="_blank" rel="noreferrer">
+          Mapbox
+        </a>{' '}
+        · Weather:{' '}
+        <a href="https://open-meteo.com/" className="underline" target="_blank" rel="noreferrer">
+          Open-Meteo.com
+        </a>{' '}
+        (CC BY 4.0) · Map: OpenFreeMap, © OpenMapTiles, © OpenStreetMap contributors
+        {analysis && <> · Forecast retrieved {formatDateTime(analysis.generated_at, analysis.origin.timezone)}</>}
+      </footer>
     </div>
   )
 }
