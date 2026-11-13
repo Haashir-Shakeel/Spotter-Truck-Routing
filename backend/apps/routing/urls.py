@@ -1,2 +1,9 @@
-# Trip analysis endpoints (analyze, detail, corridor-forecast) are added in Phase 2.
-urlpatterns: list = []
+from django.urls import path
+
+from .views import PlaceSearchView, TripAnalyzeView, TripDetailView
+
+urlpatterns = [
+    path("trips/analyze/", TripAnalyzeView.as_view(), name="trip-analyze"),
+    path("trips/<uuid:analysis_id>/", TripDetailView.as_view(), name="trip-detail"),
+    path("places/", PlaceSearchView.as_view(), name="place-search"),
+]

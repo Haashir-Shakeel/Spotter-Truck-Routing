@@ -65,7 +65,15 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
     "UNAUTHENTICATED_USER": None,
     "EXCEPTION_HANDLER": "apps.core.exceptions.api_exception_handler",
+    # Analysis calls paid/limited third-party APIs, so public endpoints are rate limited per IP.
+    "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
+    "DEFAULT_THROTTLE_RATES": {
+        "trip_analyze": env("THROTTLE_TRIP_ANALYZE", default="30/hour"),
+        "place_search": env("THROTTLE_PLACE_SEARCH", default="120/minute"),
+    },
 }
+
+TRIP_MAX_DEPARTURE_DAYS_AHEAD = env.int("TRIP_MAX_DEPARTURE_DAYS_AHEAD", default=14)
 
 # External providers (keys stay server-side).
 MAPBOX_ACCESS_TOKEN = env("MAPBOX_ACCESS_TOKEN", default="")

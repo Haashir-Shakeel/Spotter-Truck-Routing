@@ -3,15 +3,19 @@
 import logging
 from typing import Any
 
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
+from django.http import Http404
 from rest_framework import status
-from rest_framework.exceptions import APIException, ValidationError
+from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
 from apps.routing.services.errors import (
+    NoRouteFoundError,
     ProviderConfigurationError,
     ProviderError,
     ProviderResponseError,
+    TripInputError,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,6 +43,19 @@ def _provider_error_response(exc: ProviderError) -> Response:
 def api_exception_handler(exc: Exception, context: dict[str, Any]) -> Response | None:
     if isinstance(exc, ProviderError):
         return _provider_error_response(exc)
+    if isinstance(exc, TripInputError):
+        http_status = (
+            status.HTTP_422_UNPROCESSABLE_ENTITY
+            if isinstance(exc, NoRouteFoundError)
+            else status.HTTP_400_BAD_REQUEST
+        )
+        return Response(_error_body(exc.code, exc.message, exc.details), status=http_status)
+
+    # Django's own exceptions (e.g. from get_object_or_404) become their DRF equivalents.
+    if isinstance(exc, Http404):
+        exc = NotFound()
+    elif isinstance(exc, DjangoPermissionDenied):
+        exc = PermissionDenied()
 
     response = exception_handler(exc, context)
 
