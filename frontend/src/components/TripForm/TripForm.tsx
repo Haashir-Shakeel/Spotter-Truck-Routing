@@ -107,7 +107,7 @@ export function TripForm({ onSubmit, loading, now = () => new Date() }: TripForm
           inputMode="numeric"
           min={1}
           max={MAX_LOAD_LB}
-          step={100}
+          step={1}
           placeholder="e.g. 35000"
           value={load}
           onChange={(e) => setLoad(e.target.value)}
