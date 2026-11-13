@@ -90,4 +90,19 @@ describe('TripForm', () => {
 
     await waitFor(() => expect(screen.getByText(/Suggestions unavailable/)).toBeInTheDocument())
   })
+
+  it('stays closed when Escape is pressed before suggestions arrive', async () => {
+    const fetchSpy = mockFetch({
+      '/api/v1/places/': () => ({ body: { results: [{ name: 'Chicago Avenue', lon: -87, lat: 40 }] } }),
+    })
+    const { user } = setup()
+    const origin = screen.getByRole('combobox', { name: 'Origin' })
+
+    await user.type(origin, 'Chicago')
+    await user.keyboard('{Escape}') // before the debounced request has answered
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalled())
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(origin).toHaveAttribute('aria-expanded', 'false')
+  })
 })

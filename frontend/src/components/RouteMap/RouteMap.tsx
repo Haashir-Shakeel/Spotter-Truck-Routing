@@ -1,7 +1,12 @@
-import type { ExpressionSpecification, GeoJSONSource, MapMouseEvent } from 'maplibre-gl'
-import { Map as MapLibreMap, NavigationControl } from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
 import { boundsOf } from '../../lib/geometry'
+import {
+  type ExpressionSpecification,
+  type GeoJSONSource,
+  MapLibreMap,
+  type MapMouseEvent,
+  NavigationControl,
+} from '../../lib/maplibre'
 import { checkpointPoints, emptyCollection, riskSegments, routeLines } from '../../lib/mapData'
 import { RISK_STYLE } from '../../lib/risk'
 import type { RouteResult } from '../../types/trip'

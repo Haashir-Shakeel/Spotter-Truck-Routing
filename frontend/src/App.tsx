@@ -48,7 +48,9 @@ function App() {
   }, [])
 
   return (
-    <div className="flex h-full flex-col bg-slate-50 text-slate-900">
+    // Desktop: fixed-height three-column dashboard with scrolling side panels.
+    // Narrow screens: panels stack and the whole page scrolls normally.
+    <div className="flex min-h-full flex-col bg-slate-50 text-slate-900 lg:h-full">
       <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
         <h1 className="text-lg font-semibold">Spotter Route Planner</h1>
         <span className="flex items-center gap-2 text-sm text-slate-600" role="status">
@@ -57,8 +59,8 @@ function App() {
         </span>
       </header>
 
-      <main className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[320px_1fr_380px]">
-        <aside className="space-y-4 overflow-y-auto border-b border-slate-200 bg-white p-4 lg:border-r lg:border-b-0">
+      <main className="grid flex-1 grid-cols-1 lg:min-h-0 lg:grid-cols-[320px_1fr_380px]">
+        <aside className="space-y-4 border-b border-slate-200 bg-white p-4 lg:overflow-y-auto lg:border-r lg:border-b-0">
           <h2 className="text-sm font-semibold tracking-wide text-slate-500 uppercase">Trip</h2>
           <TripForm onSubmit={handleSubmit} loading={state.status === 'loading'} />
           {state.error && (
@@ -91,7 +93,7 @@ function App() {
           )}
         </section>
 
-        <aside className="space-y-4 overflow-y-auto border-t border-slate-200 bg-white p-4 lg:border-t-0 lg:border-l">
+        <aside className="space-y-4 border-t border-slate-200 bg-white p-4 lg:overflow-y-auto lg:border-t-0 lg:border-l">
           {analysis ? (
             <>
               <AnalysisWarnings warnings={analysis.warnings} />
