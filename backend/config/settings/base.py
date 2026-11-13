@@ -70,6 +70,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "trip_analyze": env("THROTTLE_TRIP_ANALYZE", default="30/hour"),
         "place_search": env("THROTTLE_PLACE_SEARCH", default="120/minute"),
+        "corridor_forecast": env("THROTTLE_CORRIDOR_FORECAST", default="60/hour"),
     },
 }
 
