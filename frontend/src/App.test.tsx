@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import App from './App'
 import { mockFetch } from './test/mockFetch'
 import { sampleAnalysis } from './test/sampleAnalysis'
@@ -27,12 +27,20 @@ describe('App', () => {
     expect(await screen.findByText('API online')).toBeInTheDocument()
   })
 
-  it('reports API offline when health fails', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+  it('shows the API waking up instead of offline while it starts', async () => {
     mockFetch({ '/api/v1/health/': () => ({ status: 503, body: null }) })
     render(<App />)
 
-    expect(await screen.findByText('API offline')).toBeInTheDocument()
+    expect(await screen.findByText(/Waking API/)).toBeInTheDocument()
+    expect(screen.queryByText('API offline')).not.toBeInTheDocument()
+  })
+
+  it('credits the data sources', () => {
+    mockFetch({ '/api/v1/health/': health })
+    render(<App />)
+
+    expect(screen.getByRole('link', { name: 'Open-Meteo.com' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Mapbox' })).toBeInTheDocument()
   })
 
   it('analyzes a trip and selects the recommended route', async () => {
