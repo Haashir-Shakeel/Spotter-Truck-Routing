@@ -11,14 +11,27 @@ export function formatDuration(seconds: number): string {
   return hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`
 }
 
-/** Local time with time-zone name, e.g. "Fri 8:00 AM CST". */
-export function formatDateTime(iso: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short',
-  }).format(new Date(iso))
+const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
+  weekday: 'short',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZoneName: 'short',
+}
+
+/**
+ * Time with its zone name, e.g. "Fri 8:00 AM CST". Pass the trip's IANA zone to show trip-local
+ * time; without one (or with an unknown one) the viewer's own zone is used.
+ */
+export function formatDateTime(iso: string, timeZone?: string | null): string {
+  const date = new Date(iso)
+  if (timeZone) {
+    try {
+      return new Intl.DateTimeFormat(undefined, { ...DATE_TIME_OPTIONS, timeZone }).format(date)
+    } catch {
+      // RangeError for a zone this browser doesn't know: fall through to the viewer's zone.
+    }
+  }
+  return new Intl.DateTimeFormat(undefined, DATE_TIME_OPTIONS).format(date)
 }
 
 /** Value for <input type="datetime-local">: the next whole hour in local time. */
