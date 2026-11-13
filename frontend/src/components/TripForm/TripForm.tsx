@@ -8,6 +8,13 @@ const MAX_LOAD_LB = 150_000
 const MAX_DAYS_AHEAD = 14 // matches the backend forecast window
 const PAST_GRACE_MS = 60 * 60 * 1000
 
+// One-click walkthrough trip. Routes are real; the weather is the labelled demo scenario.
+const DEMO_TRIP = {
+  origin: { name: 'Dallas, Texas, United States', lon: -96.7969, lat: 32.7763 },
+  destination: { name: 'Memphis, Tennessee, United States', lon: -90.049, lat: 35.1495 },
+  load: '35000',
+}
+
 type Errors = Partial<Record<'origin' | 'destination' | 'departure' | 'load', string>>
 
 interface TripFormProps {
@@ -23,6 +30,7 @@ export function TripForm({ onSubmit, loading, now = () => new Date() }: TripForm
   const [departure, setDeparture] = useState(() => nextWholeHourLocal(now()))
   const [load, setLoad] = useState('')
   const [interval, setCheckpointInterval] = useState<CheckpointInterval>(25)
+  const [demoWeather, setDemoWeather] = useState(false)
   const [errors, setErrors] = useState<Errors>({})
 
   const validate = (): Errors => {
@@ -54,7 +62,16 @@ export function TripForm({ onSubmit, loading, now = () => new Date() }: TripForm
       departure_at: localInputToOffsetIso(departure),
       load_weight_lb: Number(load),
       checkpoint_interval_miles: interval,
+      demo_weather: demoWeather,
     })
+  }
+
+  const loadDemoTrip = () => {
+    setOrigin(DEMO_TRIP.origin)
+    setDestination(DEMO_TRIP.destination)
+    setLoad(DEMO_TRIP.load)
+    setDemoWeather(true)
+    setErrors({})
   }
 
   const minDeparture = toLocalInputValue(new Date(now().getTime() - PAST_GRACE_MS))
@@ -145,6 +162,26 @@ export function TripForm({ onSubmit, loading, now = () => new Date() }: TripForm
           ))}
         </div>
       </fieldset>
+
+      <div className="rounded-md bg-amber-50 p-2 ring-1 ring-amber-200">
+        <label className="flex items-start gap-2 text-sm text-amber-950">
+          <input
+            type="checkbox"
+            checked={demoWeather}
+            onChange={(e) => setDemoWeather(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-amber-600"
+          />
+          <span>
+            <span className="font-medium">Demo weather</span>
+            <span className="block text-xs text-amber-900">
+              Synthetic storms to show every risk level. Routes stay real; not a forecast.
+            </span>
+          </span>
+        </label>
+        <button type="button" onClick={loadDemoTrip} className="mt-1 ml-6 text-xs font-semibold text-amber-900 underline">
+          Fill in a demo trip
+        </button>
+      </div>
 
       <button
         type="submit"

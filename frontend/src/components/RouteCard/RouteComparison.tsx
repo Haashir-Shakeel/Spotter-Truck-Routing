@@ -35,6 +35,7 @@ export function RouteComparison({ analysis, selectedRouteId, onSelectRoute }: Ro
               selected={route.id === selectedRouteId}
               recommended={route.id === recommendation.recommended_route_id}
               ineligible={recommendation.ineligible[route.id]}
+              timeZone={analysis.destination.timezone}
               onSelect={() => onSelectRoute(route.id)}
             />
           </li>

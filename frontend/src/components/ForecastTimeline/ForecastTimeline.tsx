@@ -20,6 +20,8 @@ interface ForecastTimelineProps {
   truck: TruckPosition | null
   routeLabel: string | null
   tripHours: { from: number; to: number } | null
+  /** Trip's (origin) zone for the hour labels. */
+  timeZone?: string | null
 }
 
 function truckText(truck: TruckPosition | null, routeLabel: string | null): string | null {
@@ -42,6 +44,7 @@ export function ForecastTimeline({
   truck,
   routeLabel,
   tripHours,
+  timeZone,
 }: ForecastTimelineProps) {
   const [playing, setPlaying] = useState(false)
   const frame = useRef<number | null>(null)
@@ -79,7 +82,7 @@ export function ForecastTimeline({
   if (status === 'idle') return null
 
   const at = forecast ? hourTime(forecast, hour) : null
-  const atText = at ? formatDateTime(at.toISOString()) : ''
+  const atText = at ? formatDateTime(at.toISOString(), timeZone) : ''
   const noData = summary !== null && summary.worst === null
   const truckLine = truckText(truck, routeLabel)
 

@@ -22,6 +22,8 @@ export interface TripAnalyzeRequest {
   departure_at: string // ISO 8601 with UTC offset
   load_weight_lb: number
   checkpoint_interval_miles: CheckpointInterval
+  /** Synthetic, clearly labelled storms for walkthroughs instead of the live forecast. */
+  demo_weather?: boolean
 }
 
 export interface CheckpointWeather {
@@ -58,6 +60,8 @@ export interface RiskSummary {
 export interface RouteResult {
   id: string
   label: string
+  /** provider: offered by the routing service; via_waypoint: requested through a detour point */
+  source: 'provider' | 'via_waypoint'
   geometry: { type: 'LineString'; coordinates: LngLat[] }
   distance_miles: number
   duration_seconds: number
@@ -82,15 +86,21 @@ export interface AnalysisWarning {
   message: string
 }
 
+/** A resolved trip end, with its IANA time zone (null if the lookup failed). */
+export interface TripPlace extends Place {
+  timezone: string | null
+}
+
 export interface TripAnalysis {
   analysis_id: string
   status: 'complete'
+  weather_source: 'live' | 'demo'
   generated_at: string
   departure_at: string
   load_weight_lb: number
   checkpoint_interval_miles: CheckpointInterval
-  origin: Place
-  destination: Place
+  origin: TripPlace
+  destination: TripPlace
   recommendation: Recommendation
   routes: RouteResult[]
   warnings: AnalysisWarning[]

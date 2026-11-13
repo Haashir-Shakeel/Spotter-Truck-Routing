@@ -105,6 +105,14 @@ function App() {
           aria-label="Route map"
           aria-busy={state.status === 'loading'}
         >
+          {analysis?.weather_source === 'demo' && (
+            <p
+              role="note"
+              className="bg-amber-400 px-3 py-1.5 text-center text-xs font-semibold text-amber-950"
+            >
+              Demo weather: synthetic storms for this walkthrough, not a real forecast. Routes are real.
+            </p>
+          )}
           <div className="relative min-h-[55vh] flex-1 lg:min-h-0">
             <RouteMap
               routes={routes}
@@ -145,6 +153,7 @@ function App() {
                 truck={truck}
                 routeLabel={selectedRoute?.label ?? null}
                 tripHours={tripHours}
+                timeZone={analysis.origin.timezone}
               />
             </div>
           )}
@@ -164,6 +173,7 @@ function App() {
                   route={selectedRoute}
                   selectedIndex={selectedCheckpoint}
                   onSelect={setSelectedCheckpoint}
+                  timeZone={analysis.origin.timezone}
                 />
               )}
             </>
