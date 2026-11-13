@@ -1,10 +1,12 @@
 """In-memory providers for offline tests of the trip planner and API."""
 
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from apps.routing.domain.types import Coordinate, GeocodedPlace, HourlyForecast, RouteOption
 from apps.routing.services.geo import cumulative_distances_miles
+from apps.routing.services.providers import demo_weather_for_trip
 from apps.routing.services.trip_planner import TripPlannerService
 
 NOW = datetime(2026, 11, 13, 12, 0, tzinfo=UTC)
@@ -45,11 +47,24 @@ class FakeGeocoder:
 
 
 class FakeRouter:
-    def __init__(self, routes: Sequence[RouteOption] = (STRAIGHT, NORTH, SOUTH)) -> None:
-        self.routes = list(routes)
-        self.calls: list[tuple[Coordinate, Coordinate]] = []
+    """Returns ``routes`` for a normal request and the next of ``detours`` for each via request."""
 
-    def get_routes(self, origin: Coordinate, destination: Coordinate) -> list[RouteOption]:
+    def __init__(
+        self,
+        routes: Sequence[RouteOption] = (STRAIGHT, NORTH, SOUTH),
+        detours: Sequence[RouteOption] = (),
+    ) -> None:
+        self.routes = list(routes)
+        self.detours = list(detours)
+        self.calls: list[tuple[Coordinate, Coordinate]] = []
+        self.via_calls: list[Coordinate] = []
+
+    def get_routes(
+        self, origin: Coordinate, destination: Coordinate, *, via: Coordinate | None = None
+    ) -> list[RouteOption]:
+        if via is not None:
+            self.via_calls.append(via)
+            return [replace(self.detours.pop(0), via=via)] if self.detours else []
         self.calls.append((origin, destination))
         return list(self.routes)
 
@@ -89,15 +104,27 @@ class FakeWeather:
         return forecasts
 
 
+class FakeTimezones:
+    def __init__(self, zones: Sequence[str | None] = ("America/Chicago", "America/Chicago")):
+        self.zones = list(zones)
+
+    def timezones(self, points: Sequence[Coordinate]) -> list[str | None]:
+        return self.zones[: len(points)]
+
+
 def make_planner(
     *,
     geocoder: FakeGeocoder | None = None,
     router: FakeRouter | None = None,
     weather: FakeWeather | None = None,
+    timezones: FakeTimezones | None = None,
+    demo: bool = False,
 ) -> TripPlannerService:
     return TripPlannerService(
         geocoder=geocoder or FakeGeocoder(),
         router=router or FakeRouter(),
         weather=weather or FakeWeather(),
+        timezones=timezones or FakeTimezones(),
+        weather_for_trip=demo_weather_for_trip if demo else None,
         clock=lambda: NOW,
     )

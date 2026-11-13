@@ -26,7 +26,8 @@ class TripAnalyzeView(APIView):
         serializer = TripAnalyzeRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        analysis = providers.build_trip_planner().analyze_trip(serializer.to_trip_request())
+        planner = providers.build_trip_planner(demo=serializer.validated_data["demo_weather"])
+        analysis = planner.analyze_trip(serializer.to_trip_request())
         result = present_trip_analysis(analysis)
         record = TripAnalysisRecord.objects.create(request=request.data, result=result)
 
@@ -52,12 +53,21 @@ class CorridorForecastView(APIView):
         record = get_object_or_404(TripAnalysisRecord, pk=analysis_id)
         if record.corridor is None:
             result = record.result
-            forecast = providers.build_corridor_forecaster().forecast(
+            departure_at = datetime.fromisoformat(result["departure_at"])
+            demo_trip = None
+            if result.get("weather_source") == "demo":
+                origin, destination = result["origin"], result["destination"]
+                demo_trip = (
+                    (origin["lon"], origin["lat"]),
+                    (destination["lon"], destination["lat"]),
+                    departure_at,
+                )
+            forecast = providers.build_corridor_forecaster(demo_trip).forecast(
                 routes=[
                     [(lon, lat) for lon, lat in route["geometry"]["coordinates"]]
                     for route in result["routes"]
                 ],
-                departure_at=datetime.fromisoformat(result["departure_at"]),
+                departure_at=departure_at,
                 load_weight_lb=result["load_weight_lb"],
             )
             record.corridor = present_corridor_forecast(forecast)

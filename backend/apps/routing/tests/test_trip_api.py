@@ -13,6 +13,8 @@ from .fakes import FakeGeocoder, FakeRouter, FakeWeather, make_planner
 
 pytestmark = pytest.mark.django_db
 
+ORIGINAL_BUILD_CORRIDOR = providers.build_corridor_forecaster
+
 VALID = {
     "origin": {"name": "Origin"},
     "destination": {"name": "Destination"},
@@ -29,10 +31,12 @@ def corridor_weather() -> FakeWeather:
 
 @pytest.fixture(autouse=True)
 def fake_providers(monkeypatch: pytest.MonkeyPatch, corridor_weather: FakeWeather) -> None:
-    monkeypatch.setattr(providers, "build_trip_planner", make_planner)
+    monkeypatch.setattr(providers, "build_trip_planner", lambda demo=False: make_planner(demo=demo))
     monkeypatch.setattr(providers, "build_geocoder", FakeGeocoder)
     monkeypatch.setattr(
-        providers, "build_corridor_forecaster", lambda: CorridorForecaster(corridor_weather)
+        providers,
+        "build_corridor_forecaster",
+        lambda demo_trip=None: CorridorForecaster(corridor_weather),
     )
 
 
@@ -55,6 +59,8 @@ def test_analyze_returns_routes_checkpoints_and_recommendation(client: APIClient
     assert body["recommendation"]["recommended_route_id"] == "A"
     assert body["recommendation"]["status"] == "route_available"
     assert [r["id"] for r in body["routes"]] == ["A", "B", "C"]
+    assert body["origin"]["timezone"] == "America/Chicago"
+    assert {r["source"] for r in body["routes"]} == {"provider"}
 
     route = body["routes"][0]
     assert route["geometry"]["type"] == "LineString"
@@ -120,7 +126,7 @@ def test_trip_input_errors_use_their_own_codes(client: APIClient) -> None:
 
 def test_no_route_is_422(client: APIClient, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        providers, "build_trip_planner", lambda: make_planner(router=FakeRouter([]))
+        providers, "build_trip_planner", lambda **_: make_planner(router=FakeRouter([]))
     )
     response = analyze(client, VALID)
 
@@ -135,7 +141,9 @@ def test_provider_outage_is_503_and_nothing_is_saved(
         def get_routes(self, origin, destination):
             raise ProviderUnavailableError("Mapbox Directions", "request timed out")
 
-    monkeypatch.setattr(providers, "build_trip_planner", lambda: make_planner(router=DownRouter()))
+    monkeypatch.setattr(
+        providers, "build_trip_planner", lambda **_: make_planner(router=DownRouter())
+    )
     response = analyze(client, VALID)
 
     assert response.status_code == 503
@@ -210,10 +218,27 @@ def test_corridor_provider_outage_is_503_and_not_cached(
 
     analysis_id = analyze(client, VALID).json()["analysis_id"]
     monkeypatch.setattr(
-        providers, "build_corridor_forecaster", lambda: CorridorForecaster(DownWeather())
+        providers, "build_corridor_forecaster", lambda *_: CorridorForecaster(DownWeather())
     )
 
     response = corridor(client, analysis_id)
 
     assert response.status_code == 503
     assert TripAnalysisRecord.objects.get(pk=analysis_id).corridor is None
+
+
+def test_demo_weather_is_labelled_and_reused_by_the_corridor(
+    client: APIClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(providers, "build_corridor_forecaster", ORIGINAL_BUILD_CORRIDOR)
+    created = analyze(client, {**VALID, "demo_weather": True}).json()
+
+    assert created["weather_source"] == "demo"
+    assert created["warnings"][0]["code"] == "DEMO_WEATHER"
+
+    body = corridor(client, created["analysis_id"]).json()
+    assert body["risk"][-1] == [None] * len(body["points"])  # demo horizon: no data
+
+
+def test_live_weather_is_the_default(client: APIClient) -> None:
+    assert analyze(client, VALID).json()["weather_source"] == "live"

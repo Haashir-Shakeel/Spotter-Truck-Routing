@@ -62,6 +62,8 @@ class TripAnalyzeRequestSerializer(serializers.Serializer):
     departure_at = OffsetAwareDateTimeField()
     load_weight_lb = serializers.FloatField(min_value=1, max_value=MAX_LOAD_LB)
     checkpoint_interval_miles = serializers.ChoiceField(choices=ALLOWED_INTERVALS_MILES)
+    # Synthetic, clearly labelled storms for walkthroughs (see services/demo_weather.py).
+    demo_weather = serializers.BooleanField(required=False, default=False)
 
     def to_trip_request(self) -> TripRequest:
         data = self.validated_data
@@ -120,6 +122,9 @@ def _route(analysis: RouteAnalysis) -> dict[str, Any]:
     return {
         "id": analysis.route.route_id,
         "label": analysis.label,
+        # "provider": offered by the routing service; "via_waypoint": requested through a detour
+        # waypoint because the service offered fewer than three routes.
+        "source": "via_waypoint" if analysis.route.via else "provider",
         "geometry": {
             "type": "LineString",
             "coordinates": [
@@ -153,6 +158,7 @@ def present_trip_analysis(analysis: TripAnalysis) -> dict[str, Any]:
     request, rec = analysis.request, analysis.recommendation
     return {
         "status": "complete",
+        "weather_source": analysis.weather_source,
         "generated_at": analysis.generated_at.isoformat(),
         "departure_at": request.departure_at.isoformat(),
         "load_weight_lb": request.load_weight_lb,
@@ -161,11 +167,13 @@ def present_trip_analysis(analysis: TripAnalysis) -> dict[str, Any]:
             "name": analysis.origin.name,
             "lon": analysis.origin.lon,
             "lat": analysis.origin.lat,
+            "timezone": analysis.origin_timezone,
         },
         "destination": {
             "name": analysis.destination.name,
             "lon": analysis.destination.lon,
             "lat": analysis.destination.lat,
+            "timezone": analysis.destination_timezone,
         },
         "recommendation": {
             "status": rec.status.value,
