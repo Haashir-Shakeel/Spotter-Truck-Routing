@@ -1,4 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import type { Point } from 'geojson'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  corridorCenterLatitude,
+  type CorridorProps,
+  corridorFeatures,
+  hourProperty,
+  pixelsPerMile,
+  UNAVAILABLE_VALUE,
+} from '../../lib/corridor'
 import { boundsOf } from '../../lib/geometry'
 import {
   type ExpressionSpecification,
@@ -7,9 +16,9 @@ import {
   type MapMouseEvent,
   NavigationControl,
 } from '../../lib/maplibre'
-import { checkpointPoints, emptyCollection, riskSegments, routeLines } from '../../lib/mapData'
-import { RISK_STYLE } from '../../lib/risk'
-import type { RouteResult } from '../../types/trip'
+import { checkpointPoints, emptyCollection, riskSegments, routeBadges, routeLines } from '../../lib/mapData'
+import { RISK_ORDER, RISK_STYLE } from '../../lib/risk'
+import type { CorridorForecast, LngLat, RouteResult } from '../../types/trip'
 
 const MAP_STYLE_URL =
   import.meta.env.VITE_MAP_STYLE_URL ?? 'https://tiles.openfreemap.org/styles/liberty'
@@ -17,14 +26,31 @@ const MAP_STYLE_URL =
 // Continental US default view until a trip is analyzed.
 const DEFAULT_CENTER: [number, number] = [-96, 38.5]
 const DEFAULT_ZOOM = 3.6
+// Heatmap kernels stop growing past this zoom; sample dots carry the detail when zoomed in.
+const HEAT_MAX_ZOOM = 9
+// Calibrated so a uniform area of one level reaches density ≈ level / 4 (see lib/corridor.ts).
+const HEAT_INTENSITY = 1.2
+const FIT_BOTTOM_PADDING_DESKTOP = 230
 
-const SOURCES = { routes: 'routes', segments: 'risk-segments', checkpoints: 'checkpoints' } as const
-const LAYERS = {
-  routes: 'route-lines',
-  routeLabels: 'route-labels',
+const SOURCES = {
+  corridor: 'corridor',
+  routes: 'routes',
   segments: 'risk-segments',
   checkpoints: 'checkpoints',
+  badges: 'route-badges',
+  truck: 'truck',
 } as const
+const LAYERS = {
+  corridorHeat: 'corridor-heat',
+  corridorSamples: 'corridor-samples',
+  routes: 'route-lines',
+  segments: 'risk-segments',
+  checkpoints: 'checkpoints',
+  badges: 'route-badges',
+  badgeLabels: 'route-badge-labels',
+  truck: 'truck',
+} as const
+const CORRIDOR_LAYERS = [LAYERS.corridorHeat, LAYERS.corridorSamples]
 
 const riskColor: ExpressionSpecification = [
   'match',
@@ -42,10 +68,96 @@ const riskColor: ExpressionSpecification = [
   RISK_STYLE.UNAVAILABLE.color,
 ]
 
+const withAlpha = (hex: string, alpha: number) => {
+  const n = Number.parseInt(hex.slice(1), 16)
+  return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`
+}
+
+// Density ≈ level / 4 in a uniform area, so the ramp stops line up with the risk levels.
+const HEAT_COLOR: ExpressionSpecification = [
+  'interpolate',
+  ['linear'],
+  ['heatmap-density'],
+  0,
+  'rgba(0, 0, 0, 0)',
+  0.1,
+  withAlpha(RISK_STYLE.MODERATE.color, 0),
+  0.25,
+  withAlpha(RISK_STYLE.MODERATE.color, 0.75),
+  0.5,
+  withAlpha(RISK_STYLE.HIGH.color, 0.85),
+  0.75,
+  withAlpha(RISK_STYLE.SEVERE.color, 0.9),
+  1,
+  withAlpha(RISK_STYLE.NO_TRAVEL.color, 0.95),
+]
+
+// --- per-hour expressions: the slider only swaps which `h<N>` property these read -------------
+
+const hourValue = (hour: number): ExpressionSpecification => ['get', hourProperty(hour)]
+
+const heatWeight = (hour: number): ExpressionSpecification => [
+  '/',
+  ['max', 0, hourValue(hour)],
+  RISK_ORDER.length - 1,
+]
+
+const sampleColor = (hour: number): ExpressionSpecification => [
+  'match',
+  hourValue(hour),
+  ...RISK_ORDER.flatMap((level, i) => [i, RISK_STYLE[level].color]),
+  RISK_STYLE.UNAVAILABLE.color,
+] as ExpressionSpecification
+
+const sampleRadius = (hour: number): ExpressionSpecification => [
+  'case',
+  ['>=', hourValue(hour), 3],
+  5.5,
+  ['>=', hourValue(hour), 1],
+  3.5,
+  ['==', hourValue(hour), UNAVAILABLE_VALUE],
+  3,
+  2,
+]
+
+const heatRadius = (spacingMiles: number, latitude: number): ExpressionSpecification => [
+  'interpolate',
+  ['exponential', 2],
+  ['zoom'],
+  0,
+  spacingMiles * pixelsPerMile(0, latitude),
+  HEAT_MAX_ZOOM,
+  spacingMiles * pixelsPerMile(HEAT_MAX_ZOOM, latitude),
+]
+
 function addLayers(map: MapLibreMap) {
-  map.addSource(SOURCES.routes, { type: 'geojson', data: emptyCollection() })
-  map.addSource(SOURCES.segments, { type: 'geojson', data: emptyCollection() })
-  map.addSource(SOURCES.checkpoints, { type: 'geojson', data: emptyCollection() })
+  for (const id of Object.values(SOURCES)) map.addSource(id, { type: 'geojson', data: emptyCollection() })
+
+  // Corridor forecast sits under the routes so route identity and ETA risk stay on top.
+  map.addLayer({
+    id: LAYERS.corridorHeat,
+    type: 'heatmap',
+    source: SOURCES.corridor,
+    paint: {
+      'heatmap-weight': heatWeight(0),
+      'heatmap-intensity': HEAT_INTENSITY,
+      'heatmap-radius': 20,
+      'heatmap-color': HEAT_COLOR,
+      'heatmap-opacity': 0.7,
+    },
+  })
+  map.addLayer({
+    id: LAYERS.corridorSamples,
+    type: 'circle',
+    source: SOURCES.corridor,
+    paint: {
+      'circle-radius': sampleRadius(0),
+      'circle-color': sampleColor(0),
+      'circle-opacity': 0.75,
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': 0.5,
+    },
+  })
 
   // Route identity: neutral slate lines (never risk colors). The selected route is a dark casing.
   map.addLayer({
@@ -71,19 +183,6 @@ function addLayers(map: MapLibreMap) {
     paint: { 'line-color': riskColor, 'line-width': 6 },
   })
   map.addLayer({
-    id: LAYERS.routeLabels,
-    type: 'symbol',
-    source: SOURCES.routes,
-    layout: {
-      'symbol-placement': 'line',
-      'text-field': ['get', 'label'],
-      'text-font': ['Noto Sans Regular'],
-      'text-size': 12,
-      'symbol-spacing': 400,
-    },
-    paint: { 'text-color': '#0f172a', 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
-  })
-  map.addLayer({
     id: LAYERS.checkpoints,
     type: 'circle',
     source: SOURCES.checkpoints,
@@ -92,6 +191,42 @@ function addLayers(map: MapLibreMap) {
       'circle-color': riskColor,
       'circle-stroke-color': ['case', ['get', 'selected'], '#0f172a', '#ffffff'],
       'circle-stroke-width': ['case', ['get', 'selected'], 3, 2],
+    },
+  })
+  map.addLayer({
+    id: LAYERS.badges,
+    type: 'circle',
+    source: SOURCES.badges,
+    paint: {
+      'circle-radius': 11,
+      'circle-color': ['case', ['get', 'selected'], '#0f172a', '#ffffff'],
+      'circle-stroke-color': '#0f172a',
+      'circle-stroke-width': 2,
+    },
+  })
+  map.addLayer({
+    id: LAYERS.badgeLabels,
+    type: 'symbol',
+    source: SOURCES.badges,
+    layout: {
+      'text-field': ['get', 'id'],
+      'text-font': ['Noto Sans Bold'],
+      'text-size': 13,
+      // Always draw: basemap labels must never hide which line is which route.
+      'text-allow-overlap': true,
+      'text-ignore-placement': true,
+    },
+    paint: { 'text-color': ['case', ['get', 'selected'], '#ffffff', '#0f172a'] },
+  })
+  map.addLayer({
+    id: LAYERS.truck,
+    type: 'circle',
+    source: SOURCES.truck,
+    paint: {
+      'circle-radius': 8,
+      'circle-color': '#2563eb',
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': 3,
     },
   })
 }
@@ -103,6 +238,11 @@ interface RouteMapProps {
   selectedCheckpointIndex: number | null
   onSelectRoute: (routeId: string) => void
   onSelectCheckpoint: (index: number) => void
+  corridor?: CorridorForecast | null
+  corridorHour?: number
+  showCorridor?: boolean
+  /** Selected route's truck position at the corridor hour. */
+  truck?: LngLat | null
 }
 
 export function RouteMap({
@@ -112,6 +252,10 @@ export function RouteMap({
   selectedCheckpointIndex,
   onSelectRoute,
   onSelectCheckpoint,
+  corridor = null,
+  corridorHour = 0,
+  showCorridor = true,
+  truck = null,
 }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
@@ -138,7 +282,7 @@ export function RouteMap({
       setReady(true)
     })
 
-    const interactive = [LAYERS.checkpoints, LAYERS.routes]
+    const interactive = [LAYERS.checkpoints, LAYERS.badges, LAYERS.routes]
     map.on('click', (event: MapMouseEvent) => {
       const [hit] = map.queryRenderedFeatures(event.point, { layers: interactive })
       if (!hit) return
@@ -164,6 +308,7 @@ export function RouteMap({
     ;(map.getSource(SOURCES.routes) as GeoJSONSource).setData(
       routeLines(routes, selectedRouteId, recommendedRouteId),
     )
+    ;(map.getSource(SOURCES.badges) as GeoJSONSource).setData(routeBadges(routes, selectedRouteId))
     ;(map.getSource(SOURCES.segments) as GeoJSONSource).setData(riskSegments(selectedRoute))
     ;(map.getSource(SOURCES.checkpoints) as GeoJSONSource).setData(
       checkpointPoints(selectedRoute, selectedCheckpointIndex),
@@ -175,8 +320,55 @@ export function RouteMap({
     const map = mapRef.current
     if (!ready || !map) return
     const bounds = boundsOf(routes.map((r) => r.geometry.coordinates))
-    if (bounds) map.fitBounds(bounds, { padding: 48, duration: 600 })
+    // On desktop the forecast timeline overlays the bottom of the map; keep routes clear of it.
+    const bottom = window.matchMedia('(min-width: 1024px)').matches ? FIT_BOTTOM_PADDING_DESKTOP : 48
+    if (bounds) map.fitBounds(bounds, { padding: { top: 48, left: 48, right: 48, bottom }, duration: 600 })
   }, [ready, routes])
+
+  // Corridor data is uploaded once per forecast; every hour lives in the feature properties.
+  const corridorData = useMemo(() => (corridor ? corridorFeatures(corridor) : emptyCollection<Point, CorridorProps>()), [corridor])
+  useEffect(() => {
+    const map = mapRef.current
+    if (!ready || !map) return
+    ;(map.getSource(SOURCES.corridor) as GeoJSONSource).setData(corridorData)
+    if (corridor) {
+      map.setPaintProperty(
+        LAYERS.corridorHeat,
+        'heatmap-radius',
+        heatRadius(corridor.spacing_miles, corridorCenterLatitude(corridor)),
+      )
+    }
+  }, [ready, corridor, corridorData])
+
+  // Slider movement: swap the hour the layers read. No data upload, no refetch.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!ready || !map) return
+    map.setPaintProperty(LAYERS.corridorHeat, 'heatmap-weight', heatWeight(corridorHour))
+    map.setPaintProperty(LAYERS.corridorSamples, 'circle-color', sampleColor(corridorHour))
+    map.setPaintProperty(LAYERS.corridorSamples, 'circle-radius', sampleRadius(corridorHour))
+  }, [ready, corridorHour])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!ready || !map) return
+    for (const layer of CORRIDOR_LAYERS) {
+      map.setLayoutProperty(layer, 'visibility', showCorridor ? 'visible' : 'none')
+    }
+  }, [ready, showCorridor])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!ready || !map) return
+    ;(map.getSource(SOURCES.truck) as GeoJSONSource).setData(
+      truck
+        ? {
+            type: 'FeatureCollection',
+            features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: truck }, properties: {} }],
+          }
+        : emptyCollection(),
+    )
+  }, [ready, truck])
 
   return (
     <div
@@ -184,7 +376,7 @@ export function RouteMap({
       className="h-full w-full"
       data-testid="route-map"
       role="region"
-      aria-label="Map of route alternatives and weather checkpoints"
+      aria-label="Map of route alternatives, weather checkpoints and corridor forecast"
     />
   )
 }
