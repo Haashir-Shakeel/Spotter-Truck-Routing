@@ -33,6 +33,8 @@ extend-exclude = ["**/migrations/*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "DJ", "SIM", "RUF"]
+# Django/DRF declare config as mutable class attributes (Meta.ordering, default_error_messages).
+ignore = ["RUF012"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["apps", "config"]
