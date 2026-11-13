@@ -28,5 +28,5 @@ vi.mock('maplibre-gl', () => {
     }
   }
   class NavigationControl {}
-  return { Map, NavigationControl }
+  return { Map, NavigationControl, setWorkerUrl() {} }
 })
