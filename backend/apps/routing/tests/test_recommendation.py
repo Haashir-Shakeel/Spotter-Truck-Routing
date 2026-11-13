@@ -60,7 +60,10 @@ def test_equal_severe_and_high_then_lower_average_wins() -> None:
     )
 
     assert result.recommended_route_id == "B"
-    assert "lower average risk (0.40 versus 0.60)" in result.explanation
+    assert "lower average risk (0.40 versus 0.60), even though Route A is 3 h 0 min faster" in (
+        result.explanation
+    )
+    assert ")(" not in result.explanation.replace(" ", "")
 
 
 def test_all_risk_equal_then_shortest_time_wins() -> None:
