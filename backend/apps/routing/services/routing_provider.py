@@ -4,9 +4,12 @@ Limitations (documented, not hidden):
 - Mapbox returns *up to* three routes (the primary plus up to two alternatives). We never invent
   extra routes; callers must handle fewer.
 - The public ``mapbox/driving`` profile is not truck-restricted (no height/weight limits).
+- With a ``via`` waypoint, Mapbox returns one real route through that point (no alternatives).
+  The planner uses this only when Mapbox offers fewer than three routes.
 """
 
 from collections.abc import Sequence
+from dataclasses import replace
 from itertools import accumulate
 from typing import Any, Protocol
 
@@ -25,7 +28,9 @@ PROVIDER = "Mapbox Directions"
 
 
 class RoutingProvider(Protocol):
-    def get_routes(self, origin: Coordinate, destination: Coordinate) -> list[RouteOption]: ...
+    def get_routes(
+        self, origin: Coordinate, destination: Coordinate, *, via: Coordinate | None = None
+    ) -> list[RouteOption]: ...
 
 
 class MapboxRoutingProvider:
@@ -36,13 +41,16 @@ class MapboxRoutingProvider:
         self._token = access_token
         self._max_retries = max_retries
 
-    def get_routes(self, origin: Coordinate, destination: Coordinate) -> list[RouteOption]:
-        path = ";".join(f"{lon:.6f},{lat:.6f}" for lon, lat in (origin, destination))
+    def get_routes(
+        self, origin: Coordinate, destination: Coordinate, *, via: Coordinate | None = None
+    ) -> list[RouteOption]:
+        points = (origin, destination) if via is None else (origin, via, destination)
+        path = ";".join(f"{lon:.6f},{lat:.6f}" for lon, lat in points)
         body = get_json(
             self._client,
             MAPBOX_DIRECTIONS_URL.format(coordinates=path),
             params={
-                "alternatives": "true",
+                "alternatives": "false" if via else "true",
                 "geometries": "geojson",
                 "overview": "full",
                 "annotations": "duration",
@@ -52,7 +60,8 @@ class MapboxRoutingProvider:
             provider=PROVIDER,
             max_retries=self._max_retries,
         )
-        return parse_mapbox_directions(body)
+        routes = parse_mapbox_directions(body)
+        return [replace(route, via=via) for route in routes] if via else routes
 
 
 def _cumulative_durations(route: dict[str, Any], vertex_count: int) -> tuple[float, ...] | None:
