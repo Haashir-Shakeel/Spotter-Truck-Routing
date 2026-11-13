@@ -1,5 +1,6 @@
 """Thin API views: validate input, call a service, serialize the result."""
 
+from datetime import datetime
 from typing import Any
 
 from rest_framework import status
@@ -12,6 +13,7 @@ from .models import TripAnalysisRecord
 from .serializers import (
     PlaceSearchQuerySerializer,
     TripAnalyzeRequestSerializer,
+    present_corridor_forecast,
     present_trip_analysis,
 )
 from .services import providers
@@ -35,6 +37,32 @@ class TripDetailView(APIView):
     def get(self, request: Request, analysis_id: str) -> Response:
         record = get_object_or_404(TripAnalysisRecord, pk=analysis_id)
         return Response(_with_id(record))
+
+
+class CorridorForecastView(APIView):
+    """Hourly corridor risk (0-48 h from departure) for a saved analysis.
+
+    Computed on the first request and stored on the record, so the slider and later re-opens
+    never trigger new provider calls.
+    """
+
+    throttle_scope = "corridor_forecast"
+
+    def get(self, request: Request, analysis_id: str) -> Response:
+        record = get_object_or_404(TripAnalysisRecord, pk=analysis_id)
+        if record.corridor is None:
+            result = record.result
+            forecast = providers.build_corridor_forecaster().forecast(
+                routes=[
+                    [(lon, lat) for lon, lat in route["geometry"]["coordinates"]]
+                    for route in result["routes"]
+                ],
+                departure_at=datetime.fromisoformat(result["departure_at"]),
+                load_weight_lb=result["load_weight_lb"],
+            )
+            record.corridor = present_corridor_forecast(forecast)
+            record.save(update_fields=["corridor"])
+        return Response({"analysis_id": str(record.id), **record.corridor})
 
 
 class PlaceSearchView(APIView):

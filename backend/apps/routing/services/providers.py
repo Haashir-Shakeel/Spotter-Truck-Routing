@@ -8,6 +8,7 @@ from functools import cache
 import httpx
 from django.conf import settings
 
+from .corridor_forecast import CorridorForecaster
 from .geocoding import MapboxGeocodingProvider
 from .routing_provider import MapboxRoutingProvider
 from .trip_planner import TripPlannerService
@@ -30,6 +31,16 @@ def build_geocoder() -> MapboxGeocodingProvider:
     )
 
 
+def build_weather() -> OpenMeteoWeatherProvider:
+    return OpenMeteoWeatherProvider(
+        http_client(), settings.OPEN_METEO_BASE_URL, max_retries=settings.PROVIDER_MAX_RETRIES
+    )
+
+
+def build_corridor_forecaster() -> CorridorForecaster:
+    return CorridorForecaster(build_weather())
+
+
 def build_trip_planner() -> TripPlannerService:
     retries = settings.PROVIDER_MAX_RETRIES
     return TripPlannerService(
@@ -37,8 +48,6 @@ def build_trip_planner() -> TripPlannerService:
         router=MapboxRoutingProvider(
             http_client(), settings.MAPBOX_ACCESS_TOKEN, max_retries=retries
         ),
-        weather=OpenMeteoWeatherProvider(
-            http_client(), settings.OPEN_METEO_BASE_URL, max_retries=retries
-        ),
+        weather=build_weather(),
         max_departure_days_ahead=settings.TRIP_MAX_DEPARTURE_DAYS_AHEAD,
     )

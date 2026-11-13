@@ -20,6 +20,8 @@ vi.mock('maplibre-gl', () => {
       return { setData() {} }
     }
     fitBounds() {}
+    setPaintProperty() {}
+    setLayoutProperty() {}
     queryRenderedFeatures() {
       return []
     }

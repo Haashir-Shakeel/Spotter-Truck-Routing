@@ -50,6 +50,46 @@ def point_at_distance(
     return interpolate_on_segment(coordinates, *segment_position(cumulative, target))
 
 
+def simplify_polyline(
+    coordinates: Sequence[Coordinate], tolerance_miles: float
+) -> list[Coordinate]:
+    """Douglas-Peucker simplification for display; always keeps both endpoints.
+
+    Distances are measured in a local equirectangular projection (miles), which is accurate at
+    the sub-mile scale of a tolerance. Checkpoints are computed from the full geometry, never
+    from this simplified copy.
+    """
+    if len(coordinates) <= 2:
+        return list(coordinates)
+    mid_lat = math.radians(sum(lat for _, lat in coordinates) / len(coordinates))
+    x_scale = EARTH_RADIUS_MILES * math.radians(1) * math.cos(mid_lat)
+    y_scale = EARTH_RADIUS_MILES * math.radians(1)
+    xy = [(lon * x_scale, lat * y_scale) for lon, lat in coordinates]
+
+    keep = [False] * len(xy)
+    keep[0] = keep[-1] = True
+    stack = [(0, len(xy) - 1)]
+    while stack:
+        start, end = stack.pop()
+        (x1, y1), (x2, y2) = xy[start], xy[end]
+        dx, dy = x2 - x1, y2 - y1
+        length = math.hypot(dx, dy)
+        farthest, farthest_distance = -1, tolerance_miles
+        for i in range(start + 1, end):
+            px, py = xy[i]
+            if length == 0:
+                distance = math.hypot(px - x1, py - y1)
+            else:
+                distance = abs(dy * (px - x1) - dx * (py - y1)) / length
+            if distance > farthest_distance:
+                farthest, farthest_distance = i, distance
+        if farthest >= 0:
+            keep[farthest] = True
+            stack.append((start, farthest))
+            stack.append((farthest, end))
+    return [c for c, kept in zip(coordinates, keep, strict=True) if kept]
+
+
 def validate_coordinates(coordinates: Sequence[Coordinate]) -> None:
     if len(coordinates) < 2:
         raise ValueError("A route geometry needs at least two coordinates.")

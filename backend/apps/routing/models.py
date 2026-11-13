@@ -13,6 +13,9 @@ class TripAnalysisRecord(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     request = models.JSONField()
     result = models.JSONField()
+    # Corridor forecast for the 0-48 h slider, computed on first request and then reused so
+    # moving between analyses never re-hits the weather provider.
+    corridor = models.JSONField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at"]

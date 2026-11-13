@@ -1,12 +1,15 @@
-import { useCallback, useState } from 'react'
+import { memo, useCallback, useMemo, useState } from 'react'
 import { AnalysisWarnings } from './components/AnalysisWarnings/AnalysisWarnings'
 import { CheckpointDetails } from './components/CheckpointDetails/CheckpointDetails'
+import { ForecastTimeline } from './components/ForecastTimeline/ForecastTimeline'
 import { RiskLegend } from './components/RiskLegend/RiskLegend'
 import { RouteComparison } from './components/RouteCard/RouteComparison'
 import { RouteMap } from './components/RouteMap/RouteMap'
 import { TripForm } from './components/TripForm/TripForm'
 import { type ApiHealth, useApiHealth } from './hooks/useApiHealth'
+import { useCorridorForecast } from './hooks/useCorridorForecast'
 import { useTripAnalysis } from './hooks/useTripAnalysis'
+import { hourTime, truckPositionAt } from './lib/corridor'
 import type { TripAnalyzeRequest } from './types/trip'
 
 const HEALTH_LABEL: Record<ApiHealth, string> = {
@@ -21,15 +24,41 @@ const HEALTH_DOT: Record<ApiHealth, string> = {
   offline: 'bg-red-500',
 }
 
+const HOUR_MS = 3_600_000
+
+// The side panels don't depend on the forecast hour, so slider movement skips re-rendering them.
+const MemoRouteComparison = memo(RouteComparison)
+const MemoCheckpointDetails = memo(CheckpointDetails)
+const MemoWarnings = memo(AnalysisWarnings)
+
 function App() {
   const health = useApiHealth()
   const { state, analyze } = useTripAnalysis()
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null)
   const [selectedCheckpoint, setSelectedCheckpoint] = useState<number | null>(null)
+  const [forecastHour, setForecastHour] = useState(0)
+  const [showCorridor, setShowCorridor] = useState(true)
 
   const analysis = state.data
-  const routes = analysis?.routes ?? []
+  const routes = useMemo(() => analysis?.routes ?? [], [analysis])
   const selectedRoute = routes.find((r) => r.id === selectedRouteId)
+  const { state: corridorState, retry: retryCorridor } = useCorridorForecast(analysis?.analysis_id ?? null)
+  const corridor = corridorState.data
+
+  const truck = useMemo(() => {
+    if (!corridor || !selectedRoute || !analysis) return null
+    return truckPositionAt(selectedRoute, analysis.departure_at, hourTime(corridor, forecastHour))
+  }, [corridor, selectedRoute, analysis, forecastHour])
+
+  // Hours (on the slider) during which the selected route's truck is on the road.
+  const tripHours = useMemo(() => {
+    if (!corridor || !selectedRoute || !analysis) return null
+    const start = new Date(corridor.start_at).getTime()
+    return {
+      from: Math.max(0, Math.floor((new Date(analysis.departure_at).getTime() - start) / HOUR_MS)),
+      to: Math.floor((new Date(selectedRoute.arrival_at).getTime() - start) / HOUR_MS),
+    }
+  }, [corridor, selectedRoute, analysis])
 
   const handleSubmit = useCallback(
     async (request: TripAnalyzeRequest) => {
@@ -37,6 +66,7 @@ function App() {
       if (result) {
         setSelectedRouteId(result.recommendation.recommended_route_id ?? result.routes[0]?.id ?? null)
         setSelectedCheckpoint(null)
+        setForecastHour(0)
       }
     },
     [analyze],
@@ -70,25 +100,52 @@ function App() {
           )}
         </aside>
 
-        <section className="relative min-h-[55vh] lg:min-h-0" aria-label="Route map" aria-busy={state.status === 'loading'}>
-          <RouteMap
-            routes={routes}
-            selectedRouteId={selectedRouteId}
-            recommendedRouteId={analysis?.recommendation.recommended_route_id ?? null}
-            selectedCheckpointIndex={selectedCheckpoint}
-            onSelectRoute={selectRoute}
-            onSelectCheckpoint={setSelectedCheckpoint}
-          />
+        <section
+          className="relative flex flex-col lg:min-h-0"
+          aria-label="Route map"
+          aria-busy={state.status === 'loading'}
+        >
+          <div className="relative min-h-[55vh] flex-1 lg:min-h-0">
+            <RouteMap
+              routes={routes}
+              selectedRouteId={selectedRouteId}
+              recommendedRouteId={analysis?.recommendation.recommended_route_id ?? null}
+              selectedCheckpointIndex={selectedCheckpoint}
+              onSelectRoute={selectRoute}
+              onSelectCheckpoint={setSelectedCheckpoint}
+              corridor={corridor}
+              corridorHour={forecastHour}
+              showCorridor={showCorridor}
+              truck={truck?.lngLat ?? null}
+            />
+            {analysis && (
+              <div className="absolute top-2 left-2">
+                <RiskLegend corridor={showCorridor && corridor !== null} />
+              </div>
+            )}
+            {state.status === 'loading' && (
+              <div className="absolute inset-x-0 top-2 flex justify-center">
+                <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white shadow">
+                  Fetching routes and forecasts…
+                </span>
+              </div>
+            )}
+          </div>
           {analysis && (
-            <div className="absolute bottom-8 left-2">
-              <RiskLegend />
-            </div>
-          )}
-          {state.status === 'loading' && (
-            <div className="absolute inset-x-0 top-2 flex justify-center">
-              <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white shadow">
-                Fetching routes and forecasts…
-              </span>
+            <div className="border-t border-slate-200 bg-slate-50 p-2 lg:absolute lg:inset-x-3 lg:bottom-8 lg:mx-auto lg:max-w-2xl lg:border-0 lg:bg-transparent lg:p-0">
+              <ForecastTimeline
+                status={corridorState.status}
+                forecast={corridor}
+                error={corridorState.error}
+                onRetry={retryCorridor}
+                hour={forecastHour}
+                onHourChange={setForecastHour}
+                visible={showCorridor}
+                onVisibleChange={setShowCorridor}
+                truck={truck}
+                routeLabel={selectedRoute?.label ?? null}
+                tripHours={tripHours}
+              />
             </div>
           )}
         </section>
@@ -96,10 +153,14 @@ function App() {
         <aside className="space-y-4 border-t border-slate-200 bg-white p-4 lg:overflow-y-auto lg:border-t-0 lg:border-l">
           {analysis ? (
             <>
-              <AnalysisWarnings warnings={analysis.warnings} />
-              <RouteComparison analysis={analysis} selectedRouteId={selectedRouteId} onSelectRoute={selectRoute} />
+              <MemoWarnings warnings={analysis.warnings} />
+              <MemoRouteComparison
+                analysis={analysis}
+                selectedRouteId={selectedRouteId}
+                onSelectRoute={selectRoute}
+              />
               {selectedRoute && (
-                <CheckpointDetails
+                <MemoCheckpointDetails
                   route={selectedRoute}
                   selectedIndex={selectedCheckpoint}
                   onSelect={setSelectedCheckpoint}

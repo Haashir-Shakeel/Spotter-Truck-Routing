@@ -8,6 +8,8 @@ from rest_framework import serializers
 
 from apps.routing.domain.risk_levels import RiskLevel
 from apps.routing.services.checkpoints import ALLOWED_INTERVALS_MILES
+from apps.routing.services.corridor_forecast import CorridorForecast
+from apps.routing.services.geo import simplify_polyline
 from apps.routing.services.trip_planner import (
     CheckpointResult,
     LocationInput,
@@ -18,6 +20,9 @@ from apps.routing.services.trip_planner import (
 
 MAX_LOAD_LB = 150_000
 _GEOMETRY_DECIMALS = 5  # ~1 m, keeps responses small
+# Display geometry is simplified to ~16 m; that is invisible on the map and cuts thousands of
+# vertices per route. Checkpoints and distances always come from the full provider geometry.
+DISPLAY_TOLERANCE_MILES = 0.01
 
 
 class OffsetAwareDateTimeField(serializers.Field):
@@ -119,7 +124,9 @@ def _route(analysis: RouteAnalysis) -> dict[str, Any]:
             "type": "LineString",
             "coordinates": [
                 [round(lon, _GEOMETRY_DECIMALS), round(lat, _GEOMETRY_DECIMALS)]
-                for lon, lat in analysis.route.coordinates
+                for lon, lat in simplify_polyline(
+                    analysis.route.coordinates, DISPLAY_TOLERANCE_MILES
+                )
             ],
         },
         "distance_miles": round(analysis.route.distance_miles, 2),
@@ -169,4 +176,23 @@ def present_trip_analysis(analysis: TripAnalysis) -> dict[str, Any]:
         },
         "routes": [_route(r) for r in analysis.routes],
         "warnings": [{"code": w.code, "message": w.message} for w in analysis.warnings],
+    }
+
+
+def present_corridor_forecast(forecast: CorridorForecast) -> dict[str, Any]:
+    """Compact series for the slider: ``risk[hour][point]`` is a RiskLevel value or null.
+
+    Levels are integers (index into ``levels``) so 49 hours x a few hundred points stay small.
+    """
+    grid = forecast.grid
+    return {
+        "start_at": forecast.start_at.isoformat(),
+        "hour_count": forecast.hour_count,
+        "spacing_miles": grid.spacing_miles,
+        "buffer_miles": grid.buffer_miles,
+        "levels": [level.name for level in RiskLevel],
+        "points": [[lon, lat] for lon, lat in grid.points],
+        "risk": [
+            [None if level is None else int(level) for level in hour] for hour in forecast.risk
+        ],
     }

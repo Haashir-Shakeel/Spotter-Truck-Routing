@@ -71,7 +71,8 @@ def _compare(best: RouteRiskSummary, other: RouteRiskSummary) -> str:
 
     if other.duration_seconds < best.duration_seconds:
         gap = _format_duration(best.duration_seconds - other.duration_seconds)
-        clause += f" ({other.label} is {gap} faster, but weather exposure takes priority)"
+        # A comma, not brackets: the average-risk clause already ends in a bracketed pair.
+        clause += f", even though {other.label} is {gap} faster"
     return clause
 
 

@@ -1,7 +1,7 @@
 /** Pure builders for the GeoJSON the map renders. Kept out of React so they are cheap to test. */
 import type { Feature, FeatureCollection, LineString, Point } from 'geojson'
 import type { RouteResult } from '../types/trip'
-import { cumulativeMiles, sliceLine } from './geometry'
+import { cumulativeMiles, pointAtDistance, sliceLine } from './geometry'
 import { type RiskOrUnavailable, segmentRisk } from './risk'
 
 export interface RouteLineProps {
@@ -20,6 +20,14 @@ export interface CheckpointProps {
   risk: RiskOrUnavailable
   selected: boolean
 }
+
+export interface RouteBadgeProps {
+  id: string
+  selected: boolean
+}
+
+// Alternatives often share their first and last miles, so each letter sits at a different point.
+const BADGE_POSITIONS = [0.5, 0.3, 0.7]
 
 const EMPTY = { type: 'FeatureCollection', features: [] } as const
 
@@ -81,5 +89,25 @@ export function checkpointPoints(
       geometry: { type: 'Point', coordinates: [cp.lon, cp.lat] },
       properties: { index: cp.index, risk: cp.risk ?? 'UNAVAILABLE', selected: cp.index === selectedIndex },
     })),
+  }
+}
+
+/** One letter badge per route, placed along the line so overlapping routes stay identifiable. */
+export function routeBadges(
+  routes: RouteResult[],
+  selectedId: string | null,
+): FeatureCollection<Point, RouteBadgeProps> {
+  return {
+    type: 'FeatureCollection',
+    features: routes.map((route, i) => {
+      const coords = route.geometry.coordinates
+      const cumulative = cumulativeMiles(coords)
+      const at = cumulative[cumulative.length - 1] * BADGE_POSITIONS[i % BADGE_POSITIONS.length]
+      return {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: pointAtDistance(coords, cumulative, at) },
+        properties: { id: route.id, selected: route.id === selectedId },
+      }
+    }),
   }
 }
