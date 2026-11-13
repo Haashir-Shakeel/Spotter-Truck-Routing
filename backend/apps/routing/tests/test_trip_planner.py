@@ -5,7 +5,7 @@ import pytest
 
 from apps.routing.domain.risk_levels import RiskLevel
 from apps.routing.domain.types import RecommendationStatus
-from apps.routing.services.errors import NoRouteFoundError, TripInputError
+from apps.routing.services.errors import NoRouteFoundError, ProviderUnavailableError, TripInputError
 from apps.routing.services.trip_planner import LocationInput, TripRequest
 
 from .fakes import (
@@ -19,6 +19,7 @@ from .fakes import (
     FakeRouter,
     FakeWeather,
     make_planner,
+    make_route,
 )
 
 DEPARTURE = NOW + timedelta(hours=1)
@@ -123,6 +124,51 @@ def test_fewer_routes_are_reported_not_padded() -> None:
     assert len(analysis.routes) == 2
     assert [w.code for w in analysis.warnings] == ["FEWER_ROUTES"]
     assert "2 distinct routes" in analysis.warnings[0].message
+
+
+def test_detour_route_fills_in_when_provider_offers_two() -> None:
+    detour = make_route("detour", [(-89.0, 39.7)])  # ~7% longer, same speed
+    router = FakeRouter([STRAIGHT, NORTH], detours=[detour])
+    analysis = make_planner(router=router).analyze_trip(trip())
+
+    assert [r.route.route_id for r in analysis.routes] == ["A", "B", "C"]
+    assert analysis.routes[2].route.via is not None
+    assert analysis.routes[0].route.via is None
+    assert [w.code for w in analysis.warnings] == ["VIA_ROUTE"]
+    assert "offered 2 routes" in analysis.warnings[0].message
+    assert "Route C is a real drivable route" in analysis.warnings[0].message
+
+
+def test_detour_waypoints_sit_either_side_of_the_trip_midpoint() -> None:
+    router = FakeRouter([STRAIGHT, NORTH])  # no detour succeeds
+    make_planner(router=router).analyze_trip(trip())
+
+    # Origin (-90, 40) -> destination (-88, 40): travel east, so left is north.
+    left, right, far_left, far_right = router.via_calls
+    assert left[0] == pytest.approx(-89.0) and left[1] > 40
+    assert right[1] < 40
+    assert far_left[1] > left[1] and far_right[1] < right[1]
+
+
+def test_detour_that_duplicates_or_is_too_slow_is_rejected() -> None:
+    slow = make_route("slow", [(-89.0, 41.5)], mph=30)  # far more than 30% slower
+    router = FakeRouter([STRAIGHT, NORTH], detours=[NORTH, slow])
+    analysis = make_planner(router=router).analyze_trip(trip())
+
+    assert len(analysis.routes) == 2
+    assert [w.code for w in analysis.warnings] == ["FEWER_ROUTES"]
+
+
+def test_failed_detour_request_does_not_fail_the_analysis() -> None:
+    class FlakyDetours(FakeRouter):
+        def get_routes(self, origin, destination, *, via=None):
+            if via is not None:
+                raise ProviderUnavailableError("Mapbox Directions", "timed out")
+            return super().get_routes(origin, destination)
+
+    analysis = make_planner(router=FlakyDetours([STRAIGHT])).analyze_trip(trip())
+
+    assert len(analysis.routes) == 1
 
 
 def test_duplicate_provider_routes_count_once() -> None:

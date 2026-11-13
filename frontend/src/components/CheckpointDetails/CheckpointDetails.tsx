@@ -6,6 +6,8 @@ interface CheckpointDetailsProps {
   route: RouteResult
   selectedIndex: number | null
   onSelect: (index: number) => void
+  /** Trip's (origin) zone for arrival times. */
+  timeZone?: string | null
 }
 
 function RiskBadge({ level }: { level: RiskLevel | null }) {
@@ -27,7 +29,7 @@ function WeatherRow({ name, value, level }: { name: string; value: string; level
   )
 }
 
-function Detail({ checkpoint }: { checkpoint: Checkpoint }) {
+function Detail({ checkpoint, timeZone }: { checkpoint: Checkpoint; timeZone?: string | null }) {
   const { weather, risk_detail: detail } = checkpoint
   return (
     <div className="rounded-lg border border-slate-200 p-3 text-sm">
@@ -36,7 +38,7 @@ function Detail({ checkpoint }: { checkpoint: Checkpoint }) {
         <RiskBadge level={checkpoint.risk} />
       </div>
       <p className="text-xs text-slate-600">
-        Truck arrives {formatDateTime(checkpoint.arrival_at)} · {checkpoint.lat.toFixed(3)},{' '}
+        Truck arrives {formatDateTime(checkpoint.arrival_at, timeZone)} · {checkpoint.lat.toFixed(3)},{' '}
         {checkpoint.lon.toFixed(3)}
       </p>
 
@@ -61,7 +63,7 @@ function Detail({ checkpoint }: { checkpoint: Checkpoint }) {
   )
 }
 
-export function CheckpointDetails({ route, selectedIndex, onSelect }: CheckpointDetailsProps) {
+export function CheckpointDetails({ route, selectedIndex, onSelect, timeZone }: CheckpointDetailsProps) {
   const selected = route.checkpoints.find((cp) => cp.index === selectedIndex)
 
   return (
@@ -92,7 +94,7 @@ export function CheckpointDetails({ route, selectedIndex, onSelect }: Checkpoint
         })}
       </div>
       {selected ? (
-        <Detail checkpoint={selected} />
+        <Detail checkpoint={selected} timeZone={timeZone} />
       ) : (
         <p className="text-xs text-slate-500">Select a checkpoint on the map or above to see its weather.</p>
       )}

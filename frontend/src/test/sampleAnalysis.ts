@@ -26,6 +26,7 @@ function route(
   return {
     id,
     label: `Route ${id}`,
+    source: 'provider',
     geometry: {
       type: 'LineString',
       coordinates: [
@@ -57,12 +58,13 @@ function route(
 export const sampleAnalysis: TripAnalysis = {
   analysis_id: '00000000-0000-0000-0000-000000000001',
   status: 'complete',
+  weather_source: 'live',
   generated_at: '2026-11-13T12:00:00Z',
   departure_at: '2026-11-13T13:00:00Z',
   load_weight_lb: 35000,
   checkpoint_interval_miles: 25,
-  origin: { name: 'Origin City', lon: -90, lat: 40 },
-  destination: { name: 'Destination City', lon: -88, lat: 40 },
+  origin: { name: 'Origin City', lon: -90, lat: 40, timezone: 'America/Chicago' },
+  destination: { name: 'Destination City', lon: -88, lat: 40, timezone: 'America/Chicago' },
   recommendation: {
     status: 'route_available',
     recommended_route_id: 'B',

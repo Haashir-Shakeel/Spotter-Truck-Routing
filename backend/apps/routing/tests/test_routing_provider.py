@@ -100,3 +100,16 @@ def test_genuinely_different_roads_are_kept() -> None:
 def test_fixture_routes_are_all_distinct() -> None:
     routes = parse_mapbox_directions(load_fixture("mapbox_directions_synthetic.json"))
     assert len(deduplicate_routes(routes)) == 3
+
+
+def test_via_waypoint_requests_one_route_through_it(mock_client) -> None:
+    body = load_fixture("mapbox_directions_synthetic.json")
+    client, transport = mock_client(lambda r: httpx.Response(200, json=body))
+    via = (-85.5, 42.9)
+
+    routes = MapboxRoutingProvider(client, "tok").get_routes(CHICAGO, DETROIT, via=via)
+
+    request = transport.requests[0]
+    assert "-87.629800,41.878100;-85.500000,42.900000;-83.045800,42.331400" in request.url.path
+    assert request.url.params["alternatives"] == "false"
+    assert all(route.via == via for route in routes)

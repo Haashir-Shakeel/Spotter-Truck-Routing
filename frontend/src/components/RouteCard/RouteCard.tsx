@@ -7,6 +7,8 @@ interface RouteCardProps {
   selected: boolean
   recommended: boolean
   ineligible?: IneligibilityReason
+  /** Destination's zone, so arrival shows in local time where the truck arrives. */
+  timeZone?: string | null
   onSelect: () => void
 }
 
@@ -43,7 +45,7 @@ function RiskBar({ route }: { route: RouteResult }) {
   )
 }
 
-export function RouteCard({ route, selected, recommended, ineligible, onSelect }: RouteCardProps) {
+export function RouteCard({ route, selected, recommended, ineligible, timeZone, onSelect }: RouteCardProps) {
   const s = route.risk_summary
   const maxRisk = s.max_risk ?? 'UNAVAILABLE'
 
@@ -61,6 +63,14 @@ export function RouteCard({ route, selected, recommended, ineligible, onSelect }
         {recommended && (
           <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-xs font-semibold text-white">
             Recommended
+          </span>
+        )}
+        {route.source === 'via_waypoint' && (
+          <span
+            className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700"
+            title="Requested through a waypoint beside the trip because the routing service offered fewer than three routes."
+          >
+            Via waypoint
           </span>
         )}
         {ineligible && (
@@ -84,7 +94,7 @@ export function RouteCard({ route, selected, recommended, ineligible, onSelect }
         </div>
         <div>
           <dt className="text-slate-500">Arrives</dt>
-          <dd className="font-medium">{formatDateTime(route.arrival_at)}</dd>
+          <dd className="font-medium">{formatDateTime(route.arrival_at, timeZone)}</dd>
         </div>
       </dl>
 

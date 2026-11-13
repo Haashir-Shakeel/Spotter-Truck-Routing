@@ -1,6 +1,8 @@
 import math
 
-from apps.routing.services.geo import EARTH_RADIUS_MILES, simplify_polyline
+import pytest
+
+from apps.routing.services.geo import EARTH_RADIUS_MILES, offset_midpoint, simplify_polyline
 
 MILES_PER_DEGREE = EARTH_RADIUS_MILES * math.pi / 180
 
@@ -32,3 +34,12 @@ def test_simplify_closed_loop_keeps_shape() -> None:
     loop = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0), (0.0, 0.0)]
 
     assert simplify_polyline(loop, 0.01) == loop
+
+
+def test_offset_midpoint_is_left_of_travel_for_positive_offsets() -> None:
+    east = ((0.0, 0.0), (2.0, 0.0))
+
+    lon, lat = offset_midpoint(*east, 10)
+    assert lon == pytest.approx(1.0)
+    assert lat * MILES_PER_DEGREE == pytest.approx(10)
+    assert offset_midpoint(*east, -10)[1] * MILES_PER_DEGREE == pytest.approx(-10)

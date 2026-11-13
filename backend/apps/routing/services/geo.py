@@ -50,6 +50,27 @@ def point_at_distance(
     return interpolate_on_segment(coordinates, *segment_position(cumulative, target))
 
 
+def offset_midpoint(a: Coordinate, b: Coordinate, offset_miles: float) -> Coordinate:
+    """Point beside the middle of segment a->b, ``offset_miles`` to the left (negative: right).
+
+    Uses a local equirectangular projection, accurate enough for picking a detour waypoint.
+    """
+    mid_lon, mid_lat = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+    miles_per_deg_lat = EARTH_RADIUS_MILES * math.radians(1)
+    miles_per_deg_lon = miles_per_deg_lat * math.cos(math.radians(mid_lat))
+    dx = (b[0] - a[0]) * miles_per_deg_lon
+    dy = (b[1] - a[1]) * miles_per_deg_lat
+    length = math.hypot(dx, dy)
+    if length == 0:
+        return mid_lon, mid_lat
+    # Left normal of the travel direction.
+    nx, ny = -dy / length, dx / length
+    return (
+        mid_lon + nx * offset_miles / miles_per_deg_lon,
+        mid_lat + ny * offset_miles / miles_per_deg_lat,
+    )
+
+
 def simplify_polyline(
     coordinates: Sequence[Coordinate], tolerance_miles: float
 ) -> list[Coordinate]:

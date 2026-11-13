@@ -27,6 +27,9 @@ class RouteOption:
     duration_seconds: float
     # Seconds from departure at each coordinate, when the provider gives per-segment timings.
     cumulative_durations: tuple[float, ...] | None = None
+    # Set when the route was requested through a detour waypoint rather than offered by the
+    # provider as an alternative (see TripPlannerService._fetch_routes).
+    via: Coordinate | None = None
 
 
 @dataclass(frozen=True, slots=True)

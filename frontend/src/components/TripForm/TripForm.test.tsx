@@ -105,4 +105,31 @@ describe('TripForm', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
     expect(origin).toHaveAttribute('aria-expanded', 'false')
   })
+
+  it('fills a labelled demo trip with real coordinates and demo weather', async () => {
+    const { onSubmit, user } = setup()
+
+    await user.click(screen.getByRole('button', { name: 'Fill in a demo trip' }))
+    expect(screen.getByRole('checkbox', { name: /Demo weather/ })).toBeChecked()
+    await user.click(screen.getByRole('button', { name: 'Analyze routes' }))
+
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({
+      origin: { name: 'Dallas, Texas, United States', lon: -96.7969, lat: 32.7763 },
+      destination: { name: 'Memphis, Tennessee, United States' },
+      load_weight_lb: 35000,
+      demo_weather: true,
+    })
+  })
+
+  it('uses live weather unless demo weather is ticked', async () => {
+    mockFetch({ '/api/v1/places/': () => ({ body: { results: [] } }) })
+    const { onSubmit, user } = setup()
+
+    await user.type(screen.getByRole('combobox', { name: 'Origin' }), 'Chicago, IL')
+    await user.type(screen.getByRole('combobox', { name: 'Destination' }), 'Detroit, MI')
+    await user.type(screen.getByLabelText(/Load weight/), '20000')
+    await user.click(screen.getByRole('button', { name: 'Analyze routes' }))
+
+    expect(onSubmit.mock.calls[0][0].demo_weather).toBe(false)
+  })
 })
