@@ -17,5 +17,14 @@ COPY . .
 ENV PATH="/app/.venv/bin:$PATH" \
     DJANGO_SETTINGS_MODULE=config.settings.prod
 
+# Static files are collected at build time. Production settings refuse to load without their
+# secrets, so placeholder values are passed to this one command only (never baked into the image).
+RUN DJANGO_SECRET_KEY=build-only DJANGO_ALLOWED_HOSTS=localhost MAPBOX_ACCESS_TOKEN=build-only \
+    python manage.py collectstatic --noinput
+
+# Run as an unprivileged user.
+RUN useradd --system --create-home app && chmod +x start.sh
+USER app
+
 EXPOSE 8000
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2"]
+CMD ["./start.sh"]
