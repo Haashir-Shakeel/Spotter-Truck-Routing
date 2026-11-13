@@ -58,6 +58,11 @@ export function PlaceInput({ label, value, onChange, placeholder, error }: Place
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    // Escape must close even before suggestions arrive, or late results pop open over the form.
+    if (event.key === 'Escape') {
+      setOpen(false)
+      return
+    }
     if (!open || visible.length === 0) return
     if (event.key === 'ArrowDown') {
       event.preventDefault()
@@ -68,8 +73,6 @@ export function PlaceInput({ label, value, onChange, placeholder, error }: Place
     } else if (event.key === 'Enter' && active >= 0) {
       event.preventDefault()
       pick(visible[active])
-    } else if (event.key === 'Escape') {
-      setOpen(false)
     }
   }
 
