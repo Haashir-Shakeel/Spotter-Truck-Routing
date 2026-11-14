@@ -3,7 +3,7 @@
 This is a different time model from route analysis. Route risk evaluates each checkpoint at the
 truck's ETA; the corridor view shows every sample point at one *forecast hour* (departure + h).
 
-Grid (see docs/scoring-assumptions.md):
+Grid:
 - A regular grid in miles, not degrees: rows are ``spacing`` miles apart in latitude and each
   row's longitude step is widened by 1/cos(latitude), so samples stay evenly spaced on the
   ground and the heatmap does not show sample density as severity.

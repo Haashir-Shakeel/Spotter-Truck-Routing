@@ -1,6 +1,6 @@
 """Pick the weather a truck meets at a checkpoint, at its estimated arrival time.
 
-Policy (see docs/scoring-assumptions.md):
+Policy:
 - Wind is an instantaneous value at each hour, so it is linearly interpolated between the two
   forecast hours around the arrival time.
 - Rain and snow are totals for the hour *ending* at each timestamp. We use the hour whose window

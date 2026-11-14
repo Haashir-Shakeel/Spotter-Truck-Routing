@@ -19,7 +19,7 @@ if not ALLOWED_HOSTS:
     raise ImproperlyConfigured("Set DJANGO_ALLOWED_HOSTS (or deploy on Render).")
 
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[])
-# Optional, e.g. preview deployments: r"^https://spotter-app-[a-z0-9-]+\.onrender\.com$"
+# Optional, e.g. preview deployments: r"^https://your-app-[a-z0-9-]+\.vercel\.app$"
 CORS_ALLOWED_ORIGIN_REGEXES = env.list("CORS_ALLOWED_ORIGIN_REGEXES", default=[])
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
