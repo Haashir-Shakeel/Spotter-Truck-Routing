@@ -2,7 +2,6 @@
 
 Shared decimal boundaries in the brief (e.g. rain 0.10-0.25 and 0.25-0.50) are resolved with
 half-open intervals; the explicit ``>`` No Travel thresholds for rain and snow are kept as stated.
-See docs/scoring-assumptions.md.
 """
 
 import math
